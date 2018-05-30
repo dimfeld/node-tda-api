@@ -4,7 +4,8 @@
         "target": "es2017",
         "sourceMap": true,
         "alwaysStrict": true,
-        "module": "commonjs"
+        "module": "commonjs",
+        "declaration": true
     },
     "include": [
         "./src/**/*.ts"
