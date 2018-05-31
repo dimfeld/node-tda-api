@@ -1,7 +1,12 @@
 import * as _ from 'lodash';
 import * as request from 'request-promise-native';
 
+import { optionInfoFromSymbol } from 'options-analysis';
 import { OptionChain } from './option_chain';
+import { Quote, AssetType } from './quote';
+
+export * from './quote';
+export * from './option_chain';
 
 const HOST = 'https://api.tdameritrade.com';
 
@@ -79,14 +84,36 @@ export class Api {
     return this.request({ url, qs });
   }
 
-  get_quotes(symbols : string|string[]) {
+  async get_quotes(symbols : string|string[]) {
     let url = `${HOST}/v1/marketdata/quotes`;
 
-    let symbol_list = _.isArray(symbols) ? symbols.join(',') : symbols;
+    let symbol_list = _.isArray(symbols) ? symbols : [symbols];
+    let formatted_symbols = _.transform(symbol_list, (acc : {[s:string]:string}, s) => {
+      if(s.length <= 6) {
+        acc[s] = s;
+        return;
+      }
+
+      // Change from OCC format to the format that TDA expects.
+      let info = optionInfoFromSymbol(s);
+      let side = info.call ? 'C' : 'P';
+      let dollars = _.trimStart(s.slice(13, 18), ' 0');
+      let cents_raw = _.trimEnd(s.slice(18), ' 0');
+      let cents = cents_raw ? `.${cents_raw}` : '';
+      let expiration = `${info.expiration.slice(2,4)}${info.expiration.slice(4,6)}${info.expiration.slice(0, 2)}`;
+
+      let tda_symbol = `${info.underlying}_${expiration}${side}${dollars}${cents}`;
+      acc[tda_symbol] = s;
+    }, {});
+
     let qs = {
-      symbol: symbol_list,
+      symbol: _.keys(formatted_symbols).join(','),
     };
 
-    return this.request({ url, qs });
+    let results = await this.request({ url, qs });
+    return _.transform(results, (acc, result, tda_symbol) => {
+      let occ_symbol = formatted_symbols[tda_symbol];
+      acc[occ_symbol] = result;
+    }, {});
   }
 }

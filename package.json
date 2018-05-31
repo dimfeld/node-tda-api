@@ -20,6 +20,7 @@
   "dependencies": {
     "debug": "^3.1.0",
     "lodash": "^4.17.10",
+    "options-analysis": "github:dimfeld/options-analysis#v1.x.x",
     "request": "^2.85.0",
     "request-promise-native": "^1.0.5"
   }
