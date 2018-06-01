@@ -10,6 +10,27 @@ export * from './option_chain';
 
 const HOST = 'https://api.tdameritrade.com';
 
+export function occ_to_tda_symbol(occ : string) {
+  if(occ.length !== 21 || occ.indexOf('_') >= 0) {
+    // Not an OCC-format option symbol. Just return it unmodified.
+    return occ;
+  }
+
+  // Change from OCC format to the format that TDA expects.
+  let info = optionInfoFromSymbol(occ);
+
+  let side = info.call ? 'C' : 'P';
+
+  // OCC expiration is YYMMDD. TDA is MMDDYY
+  let expiration = `${info.expiration.slice(2, 4)}${info.expiration.slice(4, 6)}${info.expiration.slice(0, 2)}`;
+
+  let dollars = _.trimStart(occ.slice(13, 18), ' 0');
+  let cents_raw = _.trimEnd(occ.slice(18), ' 0');
+  let cents = cents_raw ? `.${cents_raw}` : '';
+
+  return `${info.underlying}_${expiration}${side}${dollars}${cents}`;
+}
+
 export interface GetOptionChainOptions {
   symbol: string;
   from_date?: Date;
@@ -89,20 +110,7 @@ export class Api {
 
     let symbol_list = _.isArray(symbols) ? symbols : [symbols];
     let formatted_symbols = _.transform(symbol_list, (acc : {[s:string]:string}, s) => {
-      if(s.length <= 6) {
-        acc[s] = s;
-        return;
-      }
-
-      // Change from OCC format to the format that TDA expects.
-      let info = optionInfoFromSymbol(s);
-      let side = info.call ? 'C' : 'P';
-      let dollars = _.trimStart(s.slice(13, 18), ' 0');
-      let cents_raw = _.trimEnd(s.slice(18), ' 0');
-      let cents = cents_raw ? `.${cents_raw}` : '';
-      let expiration = `${info.expiration.slice(2,4)}${info.expiration.slice(4,6)}${info.expiration.slice(0, 2)}`;
-
-      let tda_symbol = `${info.underlying}_${expiration}${side}${dollars}${cents}`;
+      let tda_symbol = occ_to_tda_symbol(s);
       acc[tda_symbol] = s;
     }, {});
 
