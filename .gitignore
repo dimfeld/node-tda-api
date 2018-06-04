@@ -62,3 +62,4 @@ typings/
 lib
 tda_auth.json
 yarn.lock
+package-lock.json
