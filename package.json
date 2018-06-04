@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "TD Ameritrade API",
   "main": "lib/index.js",
+  "types": "lib/index.d.ts",
   "repository": "git@github.com:dimfeld/node-tda-api.git",
   "author": "Daniel Imfeld <dimfeld>",
   "license": "Apache-2.0",

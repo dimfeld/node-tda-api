@@ -80,7 +80,7 @@ export class Api {
     });
   }
 
-  get_option_chain(options : GetOptionChainOptions) {
+  get_option_chain(options : GetOptionChainOptions) : PromiseLike<OptionChain> {
     let url = `${HOST}/v1/marketdata/chains`;
 
     let qs : any = {
@@ -105,7 +105,7 @@ export class Api {
     return this.request({ url, qs });
   }
 
-  async get_quotes(symbols : string|string[]) {
+  async get_quotes(symbols : string|string[]) : Promise<{[symbol:string]: Quote}> {
     let url = `${HOST}/v1/marketdata/quotes`;
 
     let symbol_list = _.isArray(symbols) ? symbols : [symbols];
@@ -119,7 +119,7 @@ export class Api {
     };
 
     let results = await this.request({ url, qs });
-    return _.transform(results, (acc, result, tda_symbol) => {
+    return _.transform(results, (acc, result : Quote, tda_symbol) => {
       let occ_symbol = formatted_symbols[tda_symbol];
       acc[occ_symbol] = result;
     }, {});
