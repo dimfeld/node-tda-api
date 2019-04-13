@@ -1,7 +1,6 @@
 import * as _ from 'lodash';
 import * as request from 'request-promise-native';
 
-import { optionInfoFromSymbol } from 'options-analysis';
 import { OptionChain } from './option_chain';
 import { Quote, AssetType } from './quote';
 
@@ -9,6 +8,25 @@ export * from './quote';
 export * from './option_chain';
 
 const HOST = 'https://api.tdameritrade.com';
+
+export function optionInfoFromSymbol(symbol: string) {
+  let underlying = symbol.slice(0, 6).trim();
+  if(symbol.length <= 6) {
+    return {
+      underlying,
+      expiration: undefined,
+      call: undefined,
+      strike: undefined,
+    };
+  }
+
+  return {
+    underlying,
+    expiration: symbol.slice(6, 12),
+    call: symbol[12] === 'C',
+    strike: +_.trimStart(symbol.slice(13)) / 1000,
+  };
+}
 
 export function occ_to_tda_symbol(occ : string) {
   if(occ.length !== 21 || occ.indexOf('_') >= 0) {
