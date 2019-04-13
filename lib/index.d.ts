@@ -2,6 +2,12 @@ import { OptionChain } from './option_chain';
 import { Quote } from './quote';
 export * from './quote';
 export * from './option_chain';
+export declare function optionInfoFromSymbol(symbol: string): {
+    underlying: string;
+    expiration: string;
+    call: boolean;
+    strike: number;
+};
 export declare function occ_to_tda_symbol(occ: string): string;
 export interface GetOptionChainOptions {
     symbol: string;
