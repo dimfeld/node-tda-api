@@ -1,8 +1,9 @@
 import * as _ from 'lodash';
-import * as request from 'request-promise-native';
+import got = require('got');
+import * as querystring from 'querystring';
 
 import { OptionChain } from './option_chain';
-import { Quote, AssetType } from './quote';
+import { Quote } from './quote';
 
 export * from './quote';
 export * from './option_chain';
@@ -28,7 +29,7 @@ export function optionInfoFromSymbol(symbol: string) {
   };
 }
 
-export function occ_to_tda_symbol(occ : string) {
+export function occToTdaSymbol(occ : string) {
   if(occ.length !== 21 || occ.indexOf('_') >= 0) {
     // Not an OCC-format option symbol. Just return it unmodified.
     return occ;
@@ -73,32 +74,32 @@ export class Api {
 
   async init() {
     // Refresh the access token.
-    let body = await request({
-      url: `${HOST}/v1/oauth2/token`,
+    let body = await got(`${HOST}/v1/oauth2/token`, {
       method: 'POST',
-      form: {
+      form: true,
+      body: {
         grant_type: 'refresh_token',
         refresh_token: this.auth.refresh_token,
         client_id: this.auth.client_id,
-      }
+      },
     });
 
-    let result = JSON.parse(body);
+    let result = JSON.parse(body.body);
     this.access_token = result.access_token;
   }
 
-  private request(options) {
-    return request({
+  private request(url, qs) {
+    let qsStr = qs ? ('?' + querystring.stringify(qs)) : '';
+    return got(url + qsStr, {
       method: 'GET',
       json: true,
-      auth: {
-        bearer: this.access_token,
+      headers: {
+        authorization: 'Bearer ' + this.access_token,
       },
-      ...options,
-    });
+    }).then((res) => res.body);
   }
 
-  get_option_chain(options : GetOptionChainOptions) : PromiseLike<OptionChain> {
+  getOptionChain(options : GetOptionChainOptions) : Promise<OptionChain> {
     let url = `${HOST}/v1/marketdata/chains`;
 
     let qs : any = {
@@ -120,15 +121,15 @@ export class Api {
       qs.fromDate = options.from_date.toISOString();
     }
 
-    return this.request({ url, qs });
+    return this.request(url, qs);
   }
 
-  async get_quotes(symbols : string|string[]) : Promise<{[symbol:string]: Quote}> {
+  async getQuotes(symbols : string|string[]) : Promise<{[symbol:string]: Quote}> {
     let url = `${HOST}/v1/marketdata/quotes`;
 
     let symbol_list = _.isArray(symbols) ? symbols : [symbols];
     let formatted_symbols = _.transform(symbol_list, (acc : {[s:string]:string}, s) => {
-      let tda_symbol = occ_to_tda_symbol(s);
+      let tda_symbol = occToTdaSymbol(s);
       acc[tda_symbol] = s;
     }, {});
 
@@ -136,7 +137,7 @@ export class Api {
       symbol: _.keys(formatted_symbols).join(','),
     };
 
-    let results = await this.request({ url, qs });
+    let results = await this.request(url, qs);
     return _.transform(results, (acc, result : Quote, tda_symbol) => {
       let occ_symbol = formatted_symbols[tda_symbol];
       acc[occ_symbol] = result;

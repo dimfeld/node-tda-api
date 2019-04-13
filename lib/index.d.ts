@@ -8,7 +8,7 @@ export declare function optionInfoFromSymbol(symbol: string): {
     call: boolean;
     strike: number;
 };
-export declare function occ_to_tda_symbol(occ: string): string;
+export declare function occToTdaSymbol(occ: string): string;
 export interface GetOptionChainOptions {
     symbol: string;
     from_date?: Date;
@@ -27,8 +27,8 @@ export declare class Api {
     constructor(auth: AuthData);
     init(): Promise<void>;
     private request;
-    get_option_chain(options: GetOptionChainOptions): PromiseLike<OptionChain>;
-    get_quotes(symbols: string | string[]): Promise<{
+    getOptionChain(options: GetOptionChainOptions): Promise<OptionChain>;
+    getQuotes(symbols: string | string[]): Promise<{
         [symbol: string]: Quote;
     }>;
 }
