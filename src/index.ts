@@ -59,6 +59,12 @@ export interface GetOptionChainOptions {
   near_the_money? : boolean;
 }
 
+export interface GetTransactionsOptions {
+  symbol? : string;
+  startDate? : string;
+  endDate? : string;
+}
+
 export interface AuthData {
   client_id : string;
   refresh_token : string;
@@ -67,6 +73,7 @@ export interface AuthData {
 export class Api {
   auth : AuthData;
   access_token : string;
+  accountId: string;
 
   constructor(auth : AuthData) {
     this.auth = auth;
@@ -86,9 +93,12 @@ export class Api {
 
     let result = JSON.parse(body.body);
     this.access_token = result.access_token;
+
+    let accountData = await this.getMainAccount();
+    this.accountId = accountData.accountId;
   }
 
-  private request(url, qs) {
+  private request(url: string, qs?) {
     let qsStr = qs ? ('?' + querystring.stringify(qs)) : '';
     return got(url + qsStr, {
       method: 'GET',
@@ -106,7 +116,8 @@ export class Api {
       symbol: options.symbol,
       range: options.near_the_money ? 'NTM' : 'ALL',
       includeQuotes: 'TRUE',
-      optionType: options.include_nonstandard ? 'ALL' : 'S',
+      optionType: 'ALL',
+      expMonth: 'ALL',
     };
 
     if(options.contract_type) {
@@ -142,5 +153,24 @@ export class Api {
       let occ_symbol = formatted_symbols[tda_symbol];
       acc[occ_symbol] = result;
     }, {});
+  }
+
+  async getAccounts() {
+    return this.request(`${HOST}/v1/accounts`);
+  }
+
+  async getMainAccount() {
+    let accounts = await this.getAccounts();
+    return _.values(accounts[0])[0];
+  }
+
+  async getTrades(options : GetTransactionsOptions = {}) {
+    let url = `${HOST}/v1/accounts/${this.accountId}/transactions`;
+    let qs = {
+      type: 'TRADE',
+      ..._.pick(options, ['symbol', 'startDate', 'endDate']),
+    };
+
+    return this.request(url, qs);
   }
 }
