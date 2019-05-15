@@ -50,6 +50,30 @@ export function occToTdaSymbol(occ : string) {
   return `${info.underlying}_${expiration}${side}${dollars}${cents}`;
 }
 
+export function tdaToOccSymbol(tda : string) {
+  let m = /^([a-zA-Z]+)(?:_(\d\d)(\d\d)(\d\d)([C|P])(\d+)(?:\.(\d+))?)?$/.exec(tda);
+  if(!m) {
+    throw new Error(`Failed to parse TDA symbol '${tda}'`);
+  }
+
+  let underlying = m[1];
+
+  if(!m[2]) {
+    // It's an equity symbol so just return it as-is;
+    return underlying;
+  }
+
+  underlying = _.padEnd(m[1], 6, ' ');
+  let month = m[2];
+  let day = m[3];
+  let year = m[4];
+  let side = m[5];
+  let dollars = _.padStart(m[6], 5, '0');
+  let cents = _.padEnd(m[7] || "000", 3, '0');
+
+  return `${underlying}${year}${month}${day}${side}${dollars}${cents}`;
+}
+
 export interface GetOptionChainOptions {
   symbol: string;
   from_date?: Date;
@@ -61,6 +85,11 @@ export interface GetOptionChainOptions {
 
 export interface GetTransactionsOptions {
   symbol? : string;
+  startDate? : string;
+  endDate? : string;
+}
+
+export interface GetTradeOptions {
   startDate? : string;
   endDate? : string;
 }
@@ -164,13 +193,58 @@ export class Api {
     return _.values(accounts[0])[0];
   }
 
-  async getTrades(options : GetTransactionsOptions = {}) {
+  async getTransactionHistory(options : GetTransactionsOptions = {}) {
     let url = `${HOST}/v1/accounts/${this.accountId}/transactions`;
     let qs = {
-      type: 'TRADE',
+      type: 'ALL',
       ..._.pick(options, ['symbol', 'startDate', 'endDate']),
     };
 
     return this.request(url, qs);
+  }
+
+  async getTrades(options : GetTradeOptions = {}) {
+    let url = `${HOST}/v1/accounts/${this.accountId}/orders`;
+    let qs = {
+      status: 'FILLED',
+      fromEnteredTime: options.startDate,
+      toEnteredTime: options.endDate,
+    };
+
+    let results = await this.request(url, qs);
+    return _.map(results, (trade) => {
+      let executionPrices = _.chain(trade.orderActivityCollection)
+        .flatMap((ex) => ex.executionLegs)
+        .transform((acc, executionLeg) => {
+          let legId = executionLeg.legId;
+          let info = acc[legId] || { total: 0, size: 0 };
+          info.total += executionLeg.quantity * executionLeg.price;
+          info.size += executionLeg.quantity;
+          acc[legId] = info;
+        }, [])
+        .value();
+
+      let legs = _.map(trade.orderLegCollection, (leg) => {
+        let symbol = tdaToOccSymbol(leg.instrument.symbol);
+        let multiplier = leg.instruction.startsWith('BUY') ? 1 : -1;
+        let legPrices = executionPrices[leg.legId];
+
+        let priceEach = legPrices.total / legPrices.size;
+
+        return {
+          symbol,
+          price: priceEach,
+          size: leg.quantity * multiplier,
+        };
+      });
+
+      return {
+        id: trade.orderId,
+        traded: trade.closeTime,
+        price: trade.price,
+        commissions: null,
+        legs,
+      };
+    });
   }
 }
