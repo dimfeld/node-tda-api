@@ -206,13 +206,24 @@ export class Api {
   async getTrades(options : GetTradeOptions = {}) {
     let url = `${HOST}/v1/accounts/${this.accountId}/orders`;
     let qs = {
-      status: 'FILLED',
       fromEnteredTime: options.startDate,
       toEnteredTime: options.endDate,
     };
 
     let results = await this.request(url, qs);
-    return _.map(results, (trade) => {
+
+    let trades = _.flatMap(results, (result) => {
+      let children = result.childOrderStrategies || [];
+      if(children.length) {
+        return _.filter(children, (child) => child.status === 'FILLED');
+      } else if(result.status === 'FILLED') {
+        return [ result ];
+      } else {
+        return [];
+      }
+    });
+
+    return _.map(trades, (trade) => {
       let executionPrices = _.chain(trade.orderActivityCollection)
         .flatMap((ex) => ex.executionLegs)
         .transform((acc, executionLeg) => {
