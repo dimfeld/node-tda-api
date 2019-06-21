@@ -1,12 +1,15 @@
 import * as _ from 'lodash';
 import got = require('got');
 import * as querystring from 'querystring';
+import * as debugMod from 'debug';
 
 import { OptionChain } from './option_chain';
 import { Quote } from './quote';
 
 export * from './quote';
 export * from './option_chain';
+
+const debug = debugMod('tda_api');
 
 const HOST = 'https://api.tdameritrade.com';
 
@@ -213,17 +216,22 @@ export class Api {
     let results = await this.request(url, qs);
 
     let trades = _.flatMap(results, (result) => {
-      let children = result.childOrderStrategies || [];
-      if(children.length) {
-        return _.filter(children, (child) => child.status === 'FILLED');
-      } else if(result.status === 'FILLED') {
-        return [ result ];
-      } else {
-        return [];
+      debug(result);
+      let orders = [];
+      let children = result.childOrderStrategies;
+      if(children && children.length) {
+        orders.push(..._.filter(children, (child) => child.status === 'FILLED' || child.filledQuantity > 0));
       }
+
+      if(result.status === 'FILLED' || result.filledQuantity > 0) {
+        orders.push(result);
+      }
+
+      return orders;
     });
 
     return _.map(trades, (trade) => {
+      let latestExecution = (new Date(0)).toISOString();
       let executionPrices = _.chain(trade.orderActivityCollection)
         .flatMap((ex) => ex.executionLegs)
         .transform((acc, executionLeg) => {
@@ -232,6 +240,10 @@ export class Api {
           info.total += executionLeg.quantity * executionLeg.price;
           info.size += executionLeg.quantity;
           acc[legId] = info;
+
+          if(executionLeg.time > latestExecution) {
+            latestExecution = executionLeg.time;
+          }
         }, [])
         .value();
 
@@ -245,13 +257,13 @@ export class Api {
         return {
           symbol,
           price: priceEach,
-          size: leg.quantity * multiplier,
+          size: legPrices.size * multiplier,
         };
       });
 
       return {
         id: trade.orderId,
-        traded: trade.closeTime,
+        traded: trade.closeTime || latestExecution,
         price: trade.price,
         commissions: null,
         legs,
