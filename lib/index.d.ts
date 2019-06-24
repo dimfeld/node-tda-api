@@ -9,6 +9,7 @@ export declare function optionInfoFromSymbol(symbol: string): {
     strike: number;
 };
 export declare function occToTdaSymbol(occ: string): string;
+export declare function tdaToOccSymbol(tda: string): string;
 export interface GetOptionChainOptions {
     symbol: string;
     from_date?: Date;
@@ -17,6 +18,15 @@ export interface GetOptionChainOptions {
     contract_type?: 'CALL' | 'PUT';
     near_the_money?: boolean;
 }
+export interface GetTransactionsOptions {
+    symbol?: string;
+    startDate?: string;
+    endDate?: string;
+}
+export interface GetTradeOptions {
+    startDate?: string;
+    endDate?: string;
+}
 export interface AuthData {
     client_id: string;
     refresh_token: string;
@@ -24,6 +34,7 @@ export interface AuthData {
 export declare class Api {
     auth: AuthData;
     access_token: string;
+    accountId: string;
     constructor(auth: AuthData);
     init(): Promise<void>;
     private request;
@@ -31,4 +42,18 @@ export declare class Api {
     getQuotes(symbols: string | string[]): Promise<{
         [symbol: string]: Quote;
     }>;
+    getAccounts(): Promise<any>;
+    getMainAccount(): Promise<any>;
+    getTransactionHistory(options?: GetTransactionsOptions): Promise<any>;
+    getTrades(options?: GetTradeOptions): Promise<{
+        id: any;
+        traded: any;
+        price: any;
+        commissions: any;
+        legs: {
+            symbol: string;
+            price: number;
+            size: number;
+        }[];
+    }[]>;
 }
