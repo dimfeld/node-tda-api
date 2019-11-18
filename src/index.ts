@@ -15,7 +15,7 @@ const HOST = 'https://api.tdameritrade.com';
 
 export function optionInfoFromSymbol(symbol: string) {
   let underlying = symbol.slice(0, 6).trim();
-  if(symbol.length <= 6) {
+  if (symbol.length <= 6) {
     return {
       underlying,
       expiration: undefined,
@@ -32,8 +32,8 @@ export function optionInfoFromSymbol(symbol: string) {
   };
 }
 
-export function occToTdaSymbol(occ : string) {
-  if(occ.length !== 21 || occ.indexOf('_') >= 0) {
+export function occToTdaSymbol(occ: string) {
+  if (occ.length !== 21 || occ.indexOf('_') >= 0) {
     // Not an OCC-format option symbol. Just return it unmodified.
     return occ;
   }
@@ -44,7 +44,10 @@ export function occToTdaSymbol(occ : string) {
   let side = info.call ? 'C' : 'P';
 
   // OCC expiration is YYMMDD. TDA is MMDDYY
-  let expiration = `${info.expiration.slice(2, 4)}${info.expiration.slice(4, 6)}${info.expiration.slice(0, 2)}`;
+  let expiration = `${info.expiration.slice(2, 4)}${info.expiration.slice(
+    4,
+    6
+  )}${info.expiration.slice(0, 2)}`;
 
   let dollars = _.trimStart(occ.slice(13, 18), ' 0');
   let cents_raw = _.trimEnd(occ.slice(18), ' 0');
@@ -53,15 +56,17 @@ export function occToTdaSymbol(occ : string) {
   return `${info.underlying}_${expiration}${side}${dollars}${cents}`;
 }
 
-export function tdaToOccSymbol(tda : string) {
-  let m = /^([a-zA-Z]+)(?:_(\d\d)(\d\d)(\d\d)([C|P])(\d+)(?:\.(\d+))?)?$/.exec(tda);
-  if(!m) {
+export function tdaToOccSymbol(tda: string) {
+  let m = /^([a-zA-Z]+)(?:_(\d\d)(\d\d)(\d\d)([C|P])(\d+)(?:\.(\d+))?)?$/.exec(
+    tda
+  );
+  if (!m) {
     throw new Error(`Failed to parse TDA symbol '${tda}'`);
   }
 
   let underlying = m[1];
 
-  if(!m[2]) {
+  if (!m[2]) {
     // It's an equity symbol so just return it as-is;
     return underlying;
   }
@@ -72,7 +77,7 @@ export function tdaToOccSymbol(tda : string) {
   let year = m[4];
   let side = m[5];
   let dollars = _.padStart(m[6], 5, '0');
-  let cents = _.padEnd(m[7] || "000", 3, '0');
+  let cents = _.padEnd(m[7] || '000', 3, '0');
 
   return `${underlying}${year}${month}${day}${side}${dollars}${cents}`;
 }
@@ -83,55 +88,74 @@ export interface GetOptionChainOptions {
   to_date?: Date;
   include_nonstandard?: boolean;
   contract_type?: 'CALL' | 'PUT';
-  near_the_money? : boolean;
+  near_the_money?: boolean;
 }
 
 export interface GetTransactionsOptions {
-  symbol? : string;
-  startDate? : string;
-  endDate? : string;
+  symbol?: string;
+  startDate?: string;
+  endDate?: string;
 }
 
 export interface GetTradeOptions {
-  startDate? : string;
-  endDate? : string;
+  startDate?: string;
+  endDate?: string;
 }
 
 export interface AuthData {
-  client_id : string;
-  refresh_token : string;
+  client_id: string;
+  refresh_token: string;
 }
 
 export class Api {
-  auth : AuthData;
-  access_token : string;
+  auth: AuthData;
+  access_token: string;
   accountId: string;
+  autorefresh: boolean;
 
-  constructor(auth : AuthData) {
+  constructor(auth: AuthData, autorefresh = true) {
     this.auth = auth;
+    this.autorefresh = autorefresh;
+  }
+
+  async refresh() {
+    // Refresh the access token.
+    try {
+      let body = await got(`${HOST}/v1/oauth2/token`, {
+        method: 'POST',
+        form: true,
+        body: {
+          grant_type: 'refresh_token',
+          refresh_token: this.auth.refresh_token,
+          client_id: this.auth.client_id,
+        },
+      });
+
+      let result = JSON.parse(body.body);
+      this.access_token = result.access_token;
+
+      if (this.autorefresh) {
+        setTimeout(() => this.refresh(), (result.expires_in / 2) * 1000);
+      }
+    } catch (e) {
+      console.error(e);
+      if (this.autorefresh) {
+        setTimeout(() => this.refresh, 60000);
+      } else {
+        throw e;
+      }
+    }
   }
 
   async init() {
-    // Refresh the access token.
-    let body = await got(`${HOST}/v1/oauth2/token`, {
-      method: 'POST',
-      form: true,
-      body: {
-        grant_type: 'refresh_token',
-        refresh_token: this.auth.refresh_token,
-        client_id: this.auth.client_id,
-      },
-    });
-
-    let result = JSON.parse(body.body);
-    this.access_token = result.access_token;
+    await this.refresh();
 
     let accountData = await this.getMainAccount();
     this.accountId = accountData.accountId;
   }
 
   private request(url: string, qs?) {
-    let qsStr = qs ? ('?' + querystring.stringify(qs)) : '';
+    let qsStr = qs ? '?' + querystring.stringify(qs) : '';
     return got(url + qsStr, {
       method: 'GET',
       json: true,
@@ -141,10 +165,10 @@ export class Api {
     }).then((res) => res.body);
   }
 
-  getOptionChain(options : GetOptionChainOptions) : Promise<OptionChain> {
+  getOptionChain(options: GetOptionChainOptions): Promise<OptionChain> {
     let url = `${HOST}/v1/marketdata/chains`;
 
-    let qs : any = {
+    let qs: any = {
       symbol: options.symbol,
       range: options.near_the_money ? 'NTM' : 'ALL',
       includeQuotes: 'TRUE',
@@ -152,39 +176,49 @@ export class Api {
       expMonth: 'ALL',
     };
 
-    if(options.contract_type) {
+    if (options.contract_type) {
       qs.contractType = options.contract_type;
     }
 
-    if(options.to_date) {
+    if (options.to_date) {
       qs.toDate = options.to_date.toISOString();
     }
 
-    if(options.from_date) {
+    if (options.from_date) {
       qs.fromDate = options.from_date.toISOString();
     }
 
     return this.request(url, qs);
   }
 
-  async getQuotes(symbols : string|string[]) : Promise<{[symbol:string]: Quote}> {
+  async getQuotes(
+    symbols: string | string[]
+  ): Promise<{ [symbol: string]: Quote }> {
     let url = `${HOST}/v1/marketdata/quotes`;
 
     let symbol_list = _.isArray(symbols) ? symbols : [symbols];
-    let formatted_symbols = _.transform(symbol_list, (acc : {[s:string]:string}, s) => {
-      let tda_symbol = occToTdaSymbol(s);
-      acc[tda_symbol] = s;
-    }, {});
+    let formatted_symbols = _.transform(
+      symbol_list,
+      (acc: { [s: string]: string }, s) => {
+        let tda_symbol = occToTdaSymbol(s);
+        acc[tda_symbol] = s;
+      },
+      {}
+    );
 
     let qs = {
       symbol: _.keys(formatted_symbols).join(','),
     };
 
     let results = await this.request(url, qs);
-    return _.transform(results, (acc, result : Quote, tda_symbol) => {
-      let occ_symbol = formatted_symbols[tda_symbol];
-      acc[occ_symbol] = result;
-    }, {});
+    return _.transform(
+      results,
+      (acc, result: Quote, tda_symbol) => {
+        let occ_symbol = formatted_symbols[tda_symbol];
+        acc[occ_symbol] = result;
+      },
+      {}
+    );
   }
 
   async getAccounts() {
@@ -196,7 +230,7 @@ export class Api {
     return _.values(accounts[0])[0];
   }
 
-  async getTransactionHistory(options : GetTransactionsOptions = {}) {
+  async getTransactionHistory(options: GetTransactionsOptions = {}) {
     let url = `${HOST}/v1/accounts/${this.accountId}/transactions`;
     let qs = {
       type: 'ALL',
@@ -206,7 +240,7 @@ export class Api {
     return this.request(url, qs);
   }
 
-  async getTrades(options : GetTradeOptions = {}) {
+  async getTrades(options: GetTradeOptions = {}) {
     let url = `${HOST}/v1/accounts/${this.accountId}/orders`;
     let qs = {
       fromEnteredTime: options.startDate,
@@ -219,11 +253,16 @@ export class Api {
       debug(result);
       let orders = [];
       let children = result.childOrderStrategies;
-      if(children && children.length) {
-        orders.push(..._.filter(children, (child) => child.status === 'FILLED' || child.filledQuantity > 0));
+      if (children && children.length) {
+        orders.push(
+          ..._.filter(
+            children,
+            (child) => child.status === 'FILLED' || child.filledQuantity > 0
+          )
+        );
       }
 
-      if(result.status === 'FILLED' || result.filledQuantity > 0) {
+      if (result.status === 'FILLED' || result.filledQuantity > 0) {
         orders.push(result);
       }
 
@@ -231,7 +270,7 @@ export class Api {
     });
 
     return _.map(trades, (trade) => {
-      let latestExecution = (new Date(0)).toISOString();
+      let latestExecution = new Date(0).toISOString();
       let executionPrices = _.chain(trade.orderActivityCollection)
         .flatMap((ex) => ex.executionLegs)
         .transform((acc, executionLeg) => {
@@ -241,7 +280,7 @@ export class Api {
           info.size += executionLeg.quantity;
           acc[legId] = info;
 
-          if(executionLeg.time > latestExecution) {
+          if (executionLeg.time > latestExecution) {
             latestExecution = executionLeg.time;
           }
         }, [])

@@ -35,7 +35,9 @@ export declare class Api {
     auth: AuthData;
     access_token: string;
     accountId: string;
-    constructor(auth: AuthData);
+    autorefresh: boolean;
+    constructor(auth: AuthData, autorefresh?: boolean);
+    refresh(): Promise<void>;
     init(): Promise<void>;
     private request;
     getOptionChain(options: GetOptionChainOptions): Promise<OptionChain>;
