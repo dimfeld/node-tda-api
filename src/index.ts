@@ -170,7 +170,8 @@ export class Api {
 
     let qs: any = {
       symbol: options.symbol,
-      range: options.near_the_money ? 'NTM' : 'ALL',
+      strikeCount: options.near_the_money ? 30 : undefined,
+      range: 'ALL',
       includeQuotes: 'TRUE',
       optionType: 'ALL',
       expMonth: 'ALL',
