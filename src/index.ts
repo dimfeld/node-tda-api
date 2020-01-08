@@ -3,7 +3,7 @@ import got = require('got');
 import * as querystring from 'querystring';
 import * as debugMod from 'debug';
 
-import { OptionChain } from './option_chain';
+import { OptionChain, ExpirationDateMap } from './option_chain';
 import { Quote } from './quote';
 
 export * from './quote';
@@ -165,7 +165,7 @@ export class Api {
     }).then((res) => res.body);
   }
 
-  getOptionChain(options: GetOptionChainOptions): Promise<OptionChain> {
+  async getOptionChain(options: GetOptionChainOptions): Promise<OptionChain> {
     let url = `${HOST}/v1/marketdata/chains`;
 
     let qs: any = {
@@ -189,7 +189,23 @@ export class Api {
       qs.fromDate = options.from_date.toISOString();
     }
 
-    return this.request(url, qs);
+    let result : OptionChain = await this.request(url, qs);
+
+    function convertExpDateMapSymbols(expDateMap : ExpirationDateMap|undefined) {
+      if(!expDateMap) { return; }
+      _.each(expDateMap || {}, (strikes) => {
+        _.each(strikes, (strike) => {
+          _.each(strike, (contract) => {
+            contract.symbol = tdaToOccSymbol(contract.symbol);
+          });
+        });
+      });
+    }
+
+    convertExpDateMapSymbols(result.callExpDateMap);
+    convertExpDateMapSymbols(result.putExpDateMap);
+
+    return result;
   }
 
   async getQuotes(
