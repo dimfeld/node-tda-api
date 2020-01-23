@@ -1,6 +1,6 @@
 import { assert } from 'chai';
 
-import { occToTdaSymbol } from './index';
+import { occToTdaSymbol, tdaToOccSymbol } from './index';
 
 describe('occ_to_tda_symbol', function() {
   it('converts a symbol with no cents', function() {
@@ -23,3 +23,23 @@ describe('occ_to_tda_symbol', function() {
     assert.equal(occToTdaSymbol('ANET_061518C275'), 'ANET_061518C275');
   });
 });
+
+describe('tda_to_occ_symbol', function() {
+  it('converts a symbol', function() {
+    let tda = 'NOK_012420C12.5';
+    let occ = tdaToOccSymbol(tda);
+    assert.equal(occ, 'NOK   200124C00012500');
+  });
+
+  it('converts a symbol with no cents', function() {
+    let tda = 'NOK_012420C12';
+    let occ = tdaToOccSymbol(tda);
+    assert.equal(occ, 'NOK   200124C00012000');
+  });
+
+  it('converts a symbol with no dollars', function() {
+    let tda = 'NOK_012420C.5';
+    let occ = tdaToOccSymbol(tda);
+    assert.equal(occ, 'NOK   200124C00000500');
+  });
+})
