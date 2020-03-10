@@ -140,7 +140,7 @@ export class Api {
     } catch (e) {
       console.error(e);
       if (this.autorefresh) {
-        setTimeout(() => this.refresh, 60000);
+        setTimeout(() => this.refresh(), 60000);
       } else {
         throw e;
       }
