@@ -57,7 +57,7 @@ export function occToTdaSymbol(occ: string) {
 }
 
 export function tdaToOccSymbol(tda: string) {
-  let m = /^([a-zA-Z]+)(?:_(\d\d)(\d\d)(\d\d)([C|P])(\d*)(?:\.(\d+))?)?$/.exec(
+  let m = /^([a-zA-Z0-9]+)(?:_(\d\d)(\d\d)(\d\d)([C|P])(\d+)(?:\.(\d+))?)?$/.exec(
     tda
   );
   if (!m) {
@@ -189,10 +189,14 @@ export class Api {
       qs.fromDate = options.from_date.toISOString();
     }
 
-    let result : OptionChain = await this.request(url, qs);
+    let result: OptionChain = await this.request(url, qs);
 
-    function convertExpDateMapSymbols(expDateMap : ExpirationDateMap|undefined) {
-      if(!expDateMap) { return; }
+    function convertExpDateMapSymbols(
+      expDateMap: ExpirationDateMap | undefined
+    ) {
+      if (!expDateMap) {
+        return;
+      }
       _.each(expDateMap || {}, (strikes) => {
         _.each(strikes, (strike) => {
           _.each(strike, (contract) => {
@@ -247,6 +251,12 @@ export class Api {
     return _.values(accounts[0])[0];
   }
 
+  async getOpenOrders() {
+    let url = `${HOST}/v1/accounts/${this.accountId}/orders`;
+    let results = await this.request(url);
+    return results;
+  }
+
   async getTransactionHistory(options: GetTransactionsOptions = {}) {
     let url = `${HOST}/v1/accounts/${this.accountId}/transactions`;
     let qs = {
@@ -259,7 +269,7 @@ export class Api {
 
   async getTrades(options: GetTradeOptions = {}) {
     let url = `${HOST}/v1/accounts/${this.accountId}/orders`;
-    let qs = {
+    let qs: any = {
       fromEnteredTime: options.startDate,
       toEnteredTime: options.endDate,
     };
@@ -286,44 +296,50 @@ export class Api {
       return orders;
     });
 
-    return _.map(trades, (trade) => {
-      let latestExecution = new Date(0).toISOString();
-      let executionPrices = _.chain(trade.orderActivityCollection)
-        .flatMap((ex) => ex.executionLegs)
-        .transform((acc, executionLeg) => {
-          let legId = executionLeg.legId;
-          let info = acc[legId] || { total: 0, size: 0 };
-          info.total += executionLeg.quantity * executionLeg.price;
-          info.size += executionLeg.quantity;
-          acc[legId] = info;
+    return trades
+      .map((trade) => {
+        let latestExecution = new Date(0).toISOString();
+        let executionPrices = _.chain(trade.orderActivityCollection)
+          .flatMap((ex) => ex.executionLegs)
+          .transform((acc, executionLeg) => {
+            let legId = executionLeg.legId;
+            let info = acc[legId] || { total: 0, size: 0 };
+            info.total += executionLeg.quantity * executionLeg.price;
+            info.size += executionLeg.quantity;
+            acc[legId] = info;
 
-          if (executionLeg.time > latestExecution) {
-            latestExecution = executionLeg.time;
-          }
-        }, [])
-        .value();
+            if (executionLeg.time > latestExecution) {
+              latestExecution = executionLeg.time;
+            }
+          }, [])
+          .value();
 
-      let legs = _.map(trade.orderLegCollection, (leg) => {
-        let symbol = tdaToOccSymbol(leg.instrument.symbol);
-        let multiplier = leg.instruction.startsWith('BUY') ? 1 : -1;
-        let legPrices = executionPrices[leg.legId];
+        if (!executionPrices.length) {
+          return;
+        }
 
-        let priceEach = legPrices.total / legPrices.size;
+        let legs = _.map(trade.orderLegCollection, (leg) => {
+          let symbol = tdaToOccSymbol(leg.instrument.symbol);
+          let multiplier = leg.instruction.startsWith('BUY') ? 1 : -1;
+          let legPrices = executionPrices[leg.legId];
+
+          let priceEach = legPrices.total / legPrices.size;
+
+          return {
+            symbol,
+            price: priceEach,
+            size: legPrices.size * multiplier,
+          };
+        });
 
         return {
-          symbol,
-          price: priceEach,
-          size: legPrices.size * multiplier,
+          id: trade.orderId,
+          traded: trade.closeTime || latestExecution,
+          price: trade.price,
+          commissions: null,
+          legs,
         };
-      });
-
-      return {
-        id: trade.orderId,
-        traded: trade.closeTime || latestExecution,
-        price: trade.price,
-        commissions: null,
-        legs,
-      };
-    });
+      })
+      .filter(Boolean);
   }
 }

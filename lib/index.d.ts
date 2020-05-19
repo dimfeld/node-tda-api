@@ -46,6 +46,7 @@ export declare class Api {
     }>;
     getAccounts(): Promise<any>;
     getMainAccount(): Promise<any>;
+    getOpenOrders(): Promise<any>;
     getTransactionHistory(options?: GetTransactionsOptions): Promise<any>;
     getTrades(options?: GetTradeOptions): Promise<{
         id: any;

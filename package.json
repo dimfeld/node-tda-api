@@ -23,7 +23,7 @@
     "chai": "^4.1.2",
     "mocha": "^5.2.0",
     "ts-node": "^7",
-    "typescript": "^3.7"
+    "typescript": "^3.9"
   },
   "dependencies": {
     "debug": "^3.1.0",

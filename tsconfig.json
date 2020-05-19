@@ -5,7 +5,8 @@
         "sourceMap": true,
         "alwaysStrict": true,
         "module": "commonjs",
-        "declaration": true
+        "declaration": true,
+        "lib": ["ESNext"]
     },
     "include": [
         "./src/**/*.ts"
